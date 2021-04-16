@@ -215,7 +215,7 @@ timer_interrupt (struct intr_frame *args UNUSED)
     curr_thread = list_entry(list_front(&sleeping_list), struct thread, elem);
 
     // If the first thread has not expired yet, break
-    if(timer_ticks() < t->wakeup_time) {
+    if(timer_ticks() < curr_thread->wakeup_time) {
       break;
     }
 
