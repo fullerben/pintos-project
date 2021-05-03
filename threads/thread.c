@@ -98,6 +98,7 @@ thread_init (void)
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
+  initial_thread->donated_priorities_count = 0;
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -200,6 +201,7 @@ thread_create (const char *name, int priority,
 
   /* Add to run queue. */
   thread_unblock (t);
+  thread_yield();
 
   return tid;
 }
@@ -220,6 +222,20 @@ thread_block (void)
   schedule ();
 }
 
+static bool priority_compare(struct list_elem *elem1, struct list_elem *elem2, void* aux) {
+  struct thread *tmp1;
+  struct thread *tmp2;
+
+  // Get the threads corresponding with each list elem
+  tmp1 = list_entry(elem1, struct thread, elem);
+  tmp2 = list_entry(elem2, struct thread, elem);
+
+  if(tmp1->priority > tmp2->priority) {
+    return true;
+  }
+  return false;
+}
+
 /* Transitions a blocked thread T to the ready-to-run state.
    This is an error if T is not blocked.  (Use thread_yield() to
    make the running thread ready.)
@@ -237,7 +253,7 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_push_back (&ready_list, &t->elem);
+  list_insert_ordered (&ready_list, &t->elem, priority_compare, 0);
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -308,7 +324,7 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) 
-    list_push_back (&ready_list, &cur->elem);
+    list_insert_ordered (&ready_list, &cur->elem, priority_compare, 0);
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -336,6 +352,8 @@ void
 thread_set_priority (int new_priority) 
 {
   thread_current ()->priority = new_priority;
+  list_sort(&ready_list, priority_compare, NULL);
+  thread_yield();
 }
 
 /* Returns the current thread's priority. */
