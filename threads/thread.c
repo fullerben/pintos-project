@@ -84,18 +84,18 @@ bool priority_compare(struct list_elem *elem1, struct list_elem *elem2) {
   return done;
 }
 
-void donate(struct lock* lock) {
-  enum intr_level old;
-  old = intr_disable();
+// void donate(struct lock* lock) {
+//   enum intr_level old;
+//   old = intr_disable();
 
-  thread_current()->waiting_for = lock;
+//   thread_current()->waiting_for = lock;
 
-  if(lock->donated_priority < thread_current()->donated_priority) {
-    lock->donated_priority = thread_current()->priority;
-  }
+//   if(lock->donated_priority < thread_current()->donated_priority) {
+//     lock->donated_priority = thread_current()->priority;
+//   }
 
 
-}
+// }
 
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
@@ -364,10 +364,13 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
-  enum intr_level old;
-  old = intr_disable();
+  thread_current()->priority = new_priority;
+  list_sort(&ready_list, (list_less_func*)priority_compare, NULL);
+  thread_yield();
+  // enum intr_level old;
+  // old = intr_disable();
 
-  if(thread_current()->)
+  // if(thread_current()->)
 }
 
 /* Returns the current thread's priority. */
