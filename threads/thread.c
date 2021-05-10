@@ -71,7 +71,7 @@ static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 
-static bool priority_compare(struct list_elem *elem1, struct list_elem *elem2) {
+bool priority_compare(struct list_elem *elem1, struct list_elem *elem2) {
   struct thread *tmp1;
   struct thread *tmp2;
 
@@ -82,6 +82,19 @@ static bool priority_compare(struct list_elem *elem1, struct list_elem *elem2) {
   // Compare the threads' priorities
   bool done = tmp1->priority > tmp2->priority;
   return done;
+}
+
+void donate(struct lock* lock) {
+  enum intr_level old;
+  old = intr_disable();
+
+  thread_current()->waiting_for = lock;
+
+  if(lock->donated_priority < thread_current()->donated_priority) {
+    lock->donated_priority = thread_current()->priority;
+  }
+
+
 }
 
 /* Initializes the threading system by transforming the code
@@ -351,9 +364,10 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
-  thread_current ()->priority = new_priority;
-  list_sort(&ready_list, (list_less_func*)priority_compare, NULL);
-  thread_yield();
+  enum intr_level old;
+  old = intr_disable();
+
+  if(thread_current()->)
 }
 
 /* Returns the current thread's priority. */

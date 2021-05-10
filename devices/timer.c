@@ -122,7 +122,7 @@ timer_sleep (int64_t ticks)
   curr_thread->wakeup_time = end;
 
   // Adds the thread to the thread_list, ordered by earliest wakeup times, then block
-  list_insert_ordered(&sleeping_list, &curr_thread->elem, timer_compare, NULL);
+  list_insert_ordered(&sleeping_list, &curr_thread->elem, (list_less_func*)timer_compare, NULL);
   thread_block();
   
   // Restore old interrupt level
