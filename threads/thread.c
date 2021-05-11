@@ -367,17 +367,27 @@ thread_set_priority (int new_priority)
   thread_current()->priority = new_priority;
   list_sort(&ready_list, (list_less_func*)priority_compare, NULL);
   thread_yield();
-  // enum intr_level old;
-  // old = intr_disable();
 
-  // if(thread_current()->)
+  enum intr_level old;
+  old = intr_disable();
+
+  if(thread_current()->donated_priority == thread_current()->priority) {
+    thread_current()->donated_priority = thread_current()->priority = new_priority;
+  } else if(thread_current()->donated_priority > new_priority) {
+    thread_current()->priority = new_priority;
+  } 
+
+  intr_set_level(old);
 }
 
 /* Returns the current thread's priority. */
 int
 thread_get_priority (void) 
 {
-  return thread_current ()->priority;
+  if(thread_current()->priority > thread_current()->donated_priority) {
+    return thread_current()->priority;
+  }
+  return thread_current()->old_priority;
 }
 
 /* Sets the current thread's nice value to NICE. */
