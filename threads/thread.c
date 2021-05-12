@@ -506,7 +506,14 @@ init_thread (struct thread *t, const char *name, int priority)
   t->status = THREAD_BLOCKED;
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
+
+  // Set priority, 
   t->priority = priority;
+  t->priorities[0] = priority;
+  t->priorities_size = 1;
+  t->donations = 0;
+  t->waiting_For = NULL;
+
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable ();

@@ -22,7 +22,7 @@ struct lock
   {
     struct thread *holder;      /* Thread holding lock (for debugging). */
     struct semaphore semaphore; /* Binary semaphore controlling access. */
-    int donated_priority;       /* Donated priority for lock */
+    bool donated;               /* True if lock has been donated to a thread */
     struct list_elem elem;      /* List elem so locks can be added to lists */
   };
 
@@ -48,6 +48,6 @@ void cond_broadcast (struct condition *, struct lock *);
    The compiler will not reorder operations across an
    optimization barrier.  See "Optimization Barriers" in the
    reference guide for more information.*/
-#define barrier() asm volatile ("" : : : "memory")
+#define barrier() asm volatile ( "" : : : "memory" )
 
 #endif /* threads/synch.h */

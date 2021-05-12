@@ -226,11 +226,31 @@ lock_acquire (struct lock *lock)
   old = intr_disable();
 
   // lock_try_acquire will decrement the sema and set the current thread to holder if it succeeds
-  if(lock_try_acquire(&lock->semaphore)) {
-    list_push_back(&thread_current()->held_locks, &lock->elem);
-  } else {
-    donate(lock);
+  if(lock->holder != NULL) {
+    struct thread* t = thread_current();
+
+    while(t->waiting_for != NULL) {
+      struct lock* l = t->waiting_for;
+      int index = l->holder->priorities_size;
+      l->holder->priorities[index] = t->priority;
+      l->holder->priorities_size++;
+      l->holder->priority = t->priority;
+
+      if(l->holder->status == THREAD_READY)
+        break;
+      
+      t = l->holder;
+    }
+
+    if(!lock->donated)
+      lock->holder->donations++;
+    lock->donated = true;
+    list_sort(&ready_list, (list_less_func*)priority_compare, NULL);
   }
+
+  sema_down(&lock->semaphore);
+  lock->holder = thread_current();
+  lock->holder->waiting_for = NULL;
 
   intr_set_level(old);
 }
@@ -271,25 +291,21 @@ int get_holder_priority(struct thread* thread) {
   return max;
 }
 
-struct thread* get_highest_priority_waiter(struct list* waiters) {
-  if(list_size(&waiters) == 0) {
-    return NULL;
-  } else {
-    struct list_elem *e;
-    struct thread* max_thread;
-    max_thread = list_entry (list_begin(waiters), struct thread, elem);
-    for (e = list_begin (waiters); e != list_end (waiters); e = list_next (e))
-    {
-      struct thread* t = list_entry (e, struct thread, elem);
-      int priority = thread->donated_priority;
-      if(thread->donated_priority < thread->priority) {
-        priority = thread->priority;
-      }
-      if(max->priority < max->priority)
-        max = priority;
+void update_priority_list(struct thread* t, int current_priority) {
+  int i = 0;
+  // Find the current priority
+  for(; i < t->priorities_size - 1; i++) {
+    if(t->priorities[i] == current_priority) {
+      break;
     }
   }
-  return max;
+
+  // Move everything back
+  for(; i < t->priorities_size - 1; i++) {
+    t->priorities[i] = t->priorities[i + 1];
+  }
+
+  t->priorities_size--;
 }
 
 /* Releases LOCK, which must be owned by the current thread.
@@ -306,12 +322,15 @@ lock_release (struct lock *lock)
   enum intr_level old;
   old = intr_disable();
 
-  list_remove(&lock->elem);
+  struct semaphore* sema = &lock->semaphor;
+  list_sort(&sema->waiters, (list_less_func*)priority_compare, NULL);
 
-  lock->holder->donated_priority = get_holder_priority(lock->holder);
+  if(lock->donated) {
+    thread_current()->priorities_size--;
+    list_elem e = list_entry(list_front(&sema->waiters), struct thread, elem);
 
-  lock->holder = NULL;
-  sema_up (&lock->semaphore);
+
+  }
 
   intr_set_level(old);
 }
