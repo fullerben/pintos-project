@@ -84,19 +84,6 @@ bool priority_compare(struct list_elem *elem1, struct list_elem *elem2) {
   return done;
 }
 
-// void donate(struct lock* lock) {
-//   enum intr_level old;
-//   old = intr_disable();
-
-//   thread_current()->waiting_for = lock;
-
-//   if(lock->donated_priority < thread_current()->donated_priority) {
-//     lock->donated_priority = thread_current()->priority;
-//   }
-
-
-// }
-
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
    general and it is possible in this case only because loader.S
@@ -371,12 +358,6 @@ thread_set_priority (int new_priority)
   enum intr_level old;
   old = intr_disable();
 
-  if(thread_current()->donated_priority == thread_current()->priority) {
-    thread_current()->donated_priority = thread_current()->priority = new_priority;
-  } else if(thread_current()->donated_priority > new_priority) {
-    thread_current()->priority = new_priority;
-  } 
-
   intr_set_level(old);
 }
 
@@ -384,10 +365,7 @@ thread_set_priority (int new_priority)
 int
 thread_get_priority (void) 
 {
-  if(thread_current()->priority > thread_current()->donated_priority) {
-    return thread_current()->priority;
-  }
-  return thread_current()->old_priority;
+  return thread_current()->priority;
 }
 
 /* Sets the current thread's nice value to NICE. */
@@ -512,7 +490,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->priorities[0] = priority;
   t->priorities_size = 1;
   t->donations = 0;
-  t->waiting_For = NULL;
+  t->waiting_for = NULL;
 
   t->magic = THREAD_MAGIC;
 
@@ -634,3 +612,7 @@ allocate_tid (void)
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
+
+void sort_ready_list(void) {
+  list_sort(&ready_list, (list_less_func*)priority_compare, NULL);
+}
