@@ -327,10 +327,20 @@ lock_release (struct lock *lock)
 
   if(lock->donated) {
     thread_current()->priorities_size--;
-    list_elem e = list_entry(list_front(&sema->waiters), struct thread, elem);
-
-
+    struct thread* t = list_entry(list_front(&sema->waiters), struct thread, elem);
+    update_priority_list(thread_current(), t->priority);
+    thread_current()->priority = thread_current()->priorities[thread_current()->priorities_size - 1];
+    lock->donated = false;
   }
+
+  if(thread_current()->donations == 0) {
+    thread_current()->priorities_size = 1;
+    thread_current()->priority = thread_current()->priorities[0];
+  }
+
+  lock->holder = NULL;
+
+  sema_up(&lock->semaphore);
 
   intr_set_level(old);
 }
