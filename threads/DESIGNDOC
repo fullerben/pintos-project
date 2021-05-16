@@ -1,0 +1,193 @@
+			+--------------------+
+			|        CS 406      |
+			|        PINTOS      |
+			| PROJECT 1: THREADS |
+			|   DESIGN DOCUMENT  |
+			+--------------------+
+				   
+---- GROUP ----
+
+>> Fill in the names and email addresses of your group members.
+
+Ben Fuller <fullerb@lafayette.edu>
+Jon White <whitejon@lafayette.edu>
+Basit Balogun <balogunb@lafayette.edu>
+Shiho Numakura <numakurs@lafayette.edu>
+Taku Mujuru <mujurut@lafayette.edu>
+
+---- PRELIMINARIES ----
+
+>> If you have any preliminary comments on your submission, notes for the
+>> instructor, or extra credit, please give them here.
+
+>> Please cite any offline or online sources you consulted while
+>> preparing your submission, other than the Pintos documentation, course
+>> text, lecture notes, and course staff.
+
+We found an assignment description for a similar assignment that gave more details on priority donation and gave us a clue as to where in the code we should start.
+The URL for that resource was here: https://jeason.gitbooks.io/pintos-reference-guide-sysu/content/priority_donating.html
+
+			     ALARM CLOCK
+			     ===========
+
+---- DATA STRUCTURES ----
+
+>> A1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+
+struct thread {
+	...
+	int64_t wakeup_time;
+	...
+}
+
+struct list sleeping_list;
+
+We added a wakeup time to each thread and a list for holding the sleeping threads. The sleeping list is sorted in ascending order by wakeup time, meaning the first element has the soonest wakeup time.
+
+
+---- ALGORITHMS ----
+
+>> A2: Briefly describe what happens in a call to timer_sleep(),
+>> including the effects of the timer interrupt handler.
+
+First, we disable interrupts. Then we set the interrupt time to be the current time plus the sleep time. We add this thread to the sleeping list and block it. When the interrupt is called via timer_interrupt, we loop through the sleeping threads to see if any need to wake up. If we find one, we unblock it.
+
+>> A3: What steps are taken to minimize the amount of time spent in
+>> the timer interrupt handler?
+
+We keep a sorted list, meaning on average we only need to check the first one or two elements of the sleeping list. 
+
+---- SYNCHRONIZATION ----
+
+>> A4: How are race conditions avoided when multiple threads call
+>> timer_sleep() simultaneously?
+
+New threads will be inserted into the sleeping list one at a time and they will be inserted in sorted order.
+
+>> A5: How are race conditions avoided when a timer interrupt occurs
+>> during a call to timer_sleep()?
+
+We disable interrupts, so the threads will be added to the sleeping list one at a time. 
+
+---- RATIONALE ----
+
+>> A6: Why did you choose this design?  In what ways is it superior to
+>> another design you considered?
+
+The main design consideration here was in how we managed the sleeping list. We considered at first just adding another thread state and looping through all threads in the ready list, and only looking at the ones that were sleeping. We decided that a separate sorted list that held the sleeping threads would be more efficient inside of timer_interrupt because there would be fewer threads to look at.
+
+			 PRIORITY SCHEDULING
+			 ===================
+
+---- DATA STRUCTURES ----
+
+>> B1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+
+struct thread {
+	...
+	struct lock *waiting_for;
+    struct list held_locks;
+	int priority; 
+    int donated_priority;
+	...
+}
+
+The thread struct holds a list of held locks, the lock the thread is currently waiting for, the original priority of the thread, and the highest donated priority to the thread.
+
+struct lock {
+	...
+	struct list_elem elem;
+    int holder_priority;
+	...
+}
+
+To the lock we added an elem so that locks could be added to the held_locks list in a thread. We also added a holder_priority to store the priority of the thread holding the lock for donation.
+
+>> B2: Explain the data structure used to track priority donation.
+>> Use ASCII art to diagram a nested donation.  (Alternately, submit a
+>> .png file.)
+
+All the nested priority donation happens in lock_acquire and lock_release. Inside lock acquire, if the lock is currently held, we assign the lock holder priority to the current threads priority. Then if the thread holding the lock we are waiting on is also waiting for a lock and that lock has a lower priority, we donate to it as well. Then we change the current thread to that thread and iterate, repeating the same thing for each lock holder that is itself waiting on a different lock. When the lock_release method is called, we reverse this. 
+
+There were two data structures modified to allow for this. First, the held_locks list was sorted by the donated_priority value of that lock. And second, the waiters for each semaphore were also sorted by the donated_priority value of the threads it contains. This way, we always release the highest priority thread waiting on a lock first, and we also always donate the highest priority too.
+
+
+---- ALGORITHMS ----
+
+>> B3: How do you ensure that the highest priority thread waiting for
+>> a lock, semaphore, or condition variable wakes up first?
+
+We used a sorted list for each, sorted by the value of the priority (maximum of the original priority and the donated priority).
+
+>> B4: Describe the sequence of events when a call to lock_acquire()
+>> causes a priority donation.  How is nested donation handled?
+
+First, we set the priority of the lock to be the current threads priority. Then, while the holder is not null and the holder priority is less than the current threads priority, we do the following:
+
+	- Donate the calling threads priority to the holder
+	- If the current lock's holder priority is less than the calling threads priority, we set them equal
+	- If the holder is not waiting for a lock, break
+	- Otherwise, set the current lock to the lock the holding thread is waiting for
+
+Once we acquire the lock, we add the lock to the calling thread's held_locks list, in sorted order.
+
+
+>> B5: Describe the sequence of events when lock_release() is called
+>> on a lock that a higher-priority thread is waiting for.
+
+If the calling thread's held locks list is empty, we reset the calling thread's priority. Otherwise, we get the first element of the sorted held_locks list (the one with the highest priority). Then we donate the priority of this lock the the calling thread.
+
+
+---- SYNCHRONIZATION ----
+
+>> B6: Describe a potential race in thread_set_priority() and explain
+>> how your implementation avoids it.  Can you use a lock to avoid
+>> this race?
+
+One possible race condition could occur after we get the next element on line 368 in thread.c. This is the next highest priority thread from the ready_list. We get this and then check if its priority is higher than the new_priority. If the ready_list is changed during this time, we would not have updated the next element and could yield the wrong thread. This could possibly be solved by adding a lock to the ready_list.
+
+---- RATIONALE ----
+
+>> B7: Why did you choose this design?  In what ways is it superior to
+>> another design you considered?
+
+We didn't choose this design so much as we kept adding additional things to the lock and thread structs until we got everything working. However, one strength of the design is in storing the donated priority with the lock. This allowed us to donate as many nested priorities as we wanted.
+
+
+			   SURVEY QUESTIONS
+			   ================
+
+Answering these questions is optional, but it will help us improve the
+course in future quarters.  Feel free to tell us anything you
+want--these questions are just to spur your thoughts.  You may also
+choose to respond anonymously in the course evaluations at the end of
+the quarter.
+
+>> In your opinion was this assignment, or any one of the three problems
+>> in it, too easy or too hard?  Did it take too long or too little time?
+
+We felt that this project was proportionally challenging giving the timeline and the size of the team. More generally, the actual implementation of the project did not take too long but we spent a lot of time researching in order to understand how the project files worked and how to implement solutions using the given files
+
+>> Did you find that working on a particular part of the assignment gave
+>> you greater insight into some aspect of OS design?
+
+We most definitely feel like this project gave us a lot of insight into the different aspects of operating system design. The project focused a lot on how the operating system manages all tasks including but not limited to tasks assigned by the users and tasks needed to ensure that the OS itself was running properly. Specifically, with regards to the synchronization of threads, the project allowed us to see all the different circumstances that can cause the systems to fail due to threads not being managed properly.
+
+>> Is there some particular fact or hint we should give students in
+>> future quarters to help them solve the problems?  Conversely, did you
+>> find any of our guidance to be misleading?
+
+We all found the documentation to be fairly useful. We could have benefited a lot from having a list of the files that needed to be changed for the project because that would have saved a lot more time in regards to the project but we also understand that one of the main goals was to allow us to get as broad of an overview of OS management. 
+
+>> Do you have any suggestions for the TAs to more effectively assist
+>> students, either for future quarters or the remaining projects?
+
+While we did not have any TA’s in this class one suggestion I would give TAs is to direct students towards resources online that would help them understand the project better or help student streamline the project focus areas.
+
+>> Any other comments?
+
+Assigning this as a group project is probably not the most effective way because it was difficult for each member of the group to learn about the inner workings of how the OS works through the project due to the fact that only one person could really work on it at a time and it was difficult for another person to continue the work.
