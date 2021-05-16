@@ -84,19 +84,6 @@ bool priority_compare(struct list_elem *elem1, struct list_elem *elem2) {
   return done;
 }
 
-// void donate(struct lock* lock) {
-//   enum intr_level old;
-//   old = intr_disable();
-
-//   thread_current()->waiting_for = lock;
-
-//   if(lock->donated_priority < thread_current()->donated_priority) {
-//     lock->donated_priority = thread_current()->priority;
-//   }
-
-
-// }
-
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
    general and it is possible in this case only because loader.S
@@ -364,20 +351,44 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
-  thread_current()->priority = new_priority;
-  list_sort(&ready_list, (list_less_func*)priority_compare, NULL);
-  thread_yield();
-  // enum intr_level old;
-  // old = intr_disable();
+  // thread_current()->priority = new_priority;
+  // list_sort(&ready_list, (list_less_func*)priority_compare, NULL);
+  // thread_yield();
+  
+  struct thread *t = thread_current();
 
-  // if(thread_current()->)
+  // Default case: No donated priority
+  if (t->priority == t->donated_priority) {
+    t->donated_priority = new_priority;
+    t->priority = new_priority;
+  } else {
+    t->priority = new_priority;
+  }
+
+  if(!list_empty(&ready_list)) {
+    struct thread *next = list_entry(list_begin(&ready_list), struct thread, elem);
+    // Yield to next highest pri thread 
+    if (next->donated_priority > new_priority) {
+      thread_yield();
+    }
+  }
+}
+
+void thread_donate_priority(struct thread* donee, int new_priority) {
+  donee->donated_priority = new_priority;
+  if(donee == thread_current() && !list_empty(&ready_list)) {
+    struct thread *next = list_entry(list_begin(&ready_list), struct thread, elem);
+    if(next->donated_priority > new_priority) {
+      thread_yield();
+    }
+  }
 }
 
 /* Returns the current thread's priority. */
 int
 thread_get_priority (void) 
 {
-  return thread_current ()->priority;
+  return thread_current()->priority < thread_current()->donated_priority ? thread_current()->donated_priority : thread_current()->priority;
 }
 
 /* Sets the current thread's nice value to NICE. */
@@ -497,6 +508,9 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
+  t->donated_priority = priority;
+  t->waiting_for = NULL;
+  list_init(&t->held_locks);
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable ();

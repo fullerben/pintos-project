@@ -88,14 +88,12 @@ struct thread
     char name[16];                      /* Name (for debugging purposes). */
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Starting priority without donations */
-   //  int donated_priority;               /* Donated priority */
+    int donated_priority;               /* Donated priority */
     struct list_elem allelem;           /* List element for all threads list. */
-
-    /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
     int64_t wakeup_time; // For implementing non-busy-waiting sleep function
-   //  struct lock *waiting_for;
-   //  struct list held_locks;
+    struct lock *waiting_for;
+    struct list held_locks;
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
@@ -143,7 +141,6 @@ int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
 bool priority_compare(struct list_elem *, struct list_elem *);
-
-void donate(struct lock*);
+void thread_donate_priority(struct thread*, int);
 
 #endif /* threads/thread.h */
