@@ -38,7 +38,7 @@ bool priority_lock_compare(struct list_elem* elem1, struct list_elem* elem2) {
   struct lock* lock2;
   lock1 = list_entry(elem1, struct lock, elem);
   lock2 = list_entry(elem2, struct lock, elem);
-  bool done = lock1->holder_priority < lock2->holder_priority;
+  bool done = lock1->holder_priority > lock2->holder_priority;
   return done;
 }
 
@@ -234,8 +234,8 @@ lock_acquire (struct lock *lock)
   sema_down (&lock->semaphore);
   lock->holder = thread_current ();
   lock->holder->waiting_for = NULL;
-  list_push_back(&lock->holder->held_locks, &lock->elem);
-  // list_insert_ordered(&lock->holder->held_locks, &lock->elem, (list_less_func*)priority_lock_compare, 0);
+  // list_push_back(&lock->holder->held_locks, &lock->elem);
+  list_insert_ordered(&lock->holder->held_locks, &lock->elem, (list_less_func*)priority_lock_compare, 0);
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -281,7 +281,9 @@ lock_release (struct lock *lock)
   if(list_empty(&cur->held_locks)) {
     thread_donate_priority(cur, cur->priority);
   } else { // Otherwise get from next highest priority holding the lock
-    list_sort(&cur->held_locks, (list_less_func*)priority_lock_compare, 0);
+    // list_sort(&cur->held_locks, (list_less_func*)priority_lock_compare, 0);
+    if(list_size(&cur->held_locks) > 1)
+      printf("Hello world\n");
     struct lock* next = list_entry(list_front(&cur->held_locks), struct lock, elem);
     thread_donate_priority(cur, next->holder_priority);
   }

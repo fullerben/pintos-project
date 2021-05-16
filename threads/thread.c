@@ -251,9 +251,12 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_insert_ordered(&ready_list, &t->elem, (list_less_func*)priority_compare, NULL);
-  // list_push_back (&ready_list, &t->elem);
   t->status = THREAD_READY;
+  list_insert_ordered(&ready_list, &t->elem, (list_less_func*)priority_compare, NULL);
+
+  if(thread_current() != idle_thread && thread_current()->donated_priority < t->donated_priority)
+    thread_yield();
+
   intr_set_level (old_level);
 }
 
@@ -388,7 +391,8 @@ void thread_donate_priority(struct thread* donee, int new_priority) {
 int
 thread_get_priority (void) 
 {
-  return thread_current()->priority < thread_current()->donated_priority ? thread_current()->donated_priority : thread_current()->priority;
+  // Donated_priority <= priority (original priority)
+  return thread_current()->donated_priority;
 }
 
 /* Sets the current thread's nice value to NICE. */
