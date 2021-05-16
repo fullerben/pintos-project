@@ -78,7 +78,7 @@ sema_down (struct semaphore *sema)
   old_level = intr_disable ();
   while (sema->value == 0) 
     {
-      list_push_back (&sema->waiters, &thread_current ()->elem);
+      list_insert_ordered (&sema->waiters, &thread_current ()->elem, (list_less_func*)priority_compare, NULL);
       thread_block ();
     }
   sema->value--;
@@ -281,9 +281,7 @@ lock_release (struct lock *lock)
   if(list_empty(&cur->held_locks)) {
     thread_donate_priority(cur, cur->priority);
   } else { // Otherwise get from next highest priority holding the lock
-    // list_sort(&cur->held_locks, (list_less_func*)priority_lock_compare, 0);
-    if(list_size(&cur->held_locks) > 1)
-      printf("Hello world\n");
+    list_sort(&cur->held_locks, (list_less_func*)priority_lock_compare, 0);
     struct lock* next = list_entry(list_front(&cur->held_locks), struct lock, elem);
     thread_donate_priority(cur, next->holder_priority);
   }

@@ -80,7 +80,7 @@ bool priority_compare(struct list_elem *elem1, struct list_elem *elem2) {
   tmp2 = list_entry(elem2, struct thread, elem);
 
   // Compare the threads' priorities
-  bool done = tmp1->priority > tmp2->priority;
+  bool done = tmp1->donated_priority > tmp2->donated_priority;
   return done;
 }
 
@@ -498,7 +498,7 @@ is_thread (struct thread *t)
 
 /* Does basic initialization of T as a blocked thread named
    NAME. */
-static void
+static void 
 init_thread (struct thread *t, const char *name, int priority)
 {
   enum intr_level old_level;
